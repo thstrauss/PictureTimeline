@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="PictureLib/PictureLibTests.csproj" />
+  <Project Path="PictureTimeline/PictureTimeline.csproj" />
+</Solution>
