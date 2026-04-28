@@ -37,10 +37,9 @@ jobs:
           **/TestResults/**/coverage.cobertura.xml
 
     - name: Publish test results
-      uses: EnricoMi/publish-unit-test-result-action@v2
+      uses: dorny/test-reporter@v1
       if: always()
       with:
-        files: |
-          **/TestResults/**/*.trx
-        check_name: Test Results
-        comment_mode: always
+        name: Test Results
+        path: '**/TestResults/**/*.trx'
+        reporter: 'dotnet-trx'
