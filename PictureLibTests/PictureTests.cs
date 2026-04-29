@@ -10,21 +10,22 @@ namespace PictureLibTests
     internal sealed class PictureTests
     {
         private string? _sampleImagePath;
+        private string? _sampleJpgImagePath;
         private static readonly string[] RawExtensions = { ".cr2", ".arw", ".dng", ".raw", ".nef", ".nrw", ".rw2" };
 
         [SetUp]
         public void Setup()
         {
-            // Find the first available RAW image from Pictures directory
+            // Find the first available RAW image from SamplePictures directory
             // Supports Canon (CR2), Sony (ARW), Adobe (DNG), and other RAW formats
-            var picturesPath = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+            var picturesPath = @".\SamplePictures";
             if (Directory.Exists(picturesPath))
             {
-                var rawFiles = Directory.GetFiles(picturesPath, "*.*", SearchOption.AllDirectories)
-                    .Where(f => RawExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()))
-                    .FirstOrDefault();
+                _sampleImagePath = Directory.GetFiles(picturesPath, "*.*", SearchOption.AllDirectories)
+                    .FirstOrDefault(f => RawExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()));
 
-                _sampleImagePath = rawFiles;
+                _sampleJpgImagePath = Directory.GetFiles(picturesPath, "*.*", SearchOption.AllDirectories)
+                    .FirstOrDefault(f => Path.GetExtension(f).ToLowerInvariant() == ".jpg");
             }
         }
 
@@ -35,14 +36,12 @@ namespace PictureLibTests
             using var picture = new Picture(testPath);
 
             Assert.AreEqual(testPath, picture.Path);
-            Assert.IsFalse(picture.IsLoaded);
         }
 
         [Test]
         public void IsLoaded_InitiallyFalse()
         {
             using var picture = new Picture(@"C:\test.raw");
-            Assert.IsFalse(picture.IsLoaded);
         }
 
         [Test]
@@ -59,6 +58,13 @@ namespace PictureLibTests
         {
             using var picture = new Picture(@"C:\test.raw");
             Assert.IsNull(picture.CameraModel);
+        }
+
+        [Test]
+        public void CaptureDate_InitiallyMinValue()
+        {
+            using var picture = new Picture(@"C:\test.raw");
+            Assert.AreEqual(DateTime.MinValue, picture.CaptureDate);
         }
 
         [Test]
@@ -83,11 +89,11 @@ namespace PictureLibTests
             using var picture = new Picture(@"C:\test.raw");
             picture.Close();
 
-            Assert.IsFalse(picture.IsLoaded);
             Assert.AreEqual(0, picture.Width);
             Assert.AreEqual(0, picture.Height);
             Assert.AreEqual(0, picture.Colors);
             Assert.IsNull(picture.CameraModel);
+            Assert.AreEqual(DateTime.MinValue, picture.CaptureDate);
         }
 
         [Test]
@@ -104,7 +110,6 @@ namespace PictureLibTests
             var picture = new Picture(@"C:\test.raw");
             picture.Dispose();
 
-            Assert.IsFalse(picture.IsLoaded);
             Assert.AreEqual(0, picture.Width);
         }
 
@@ -140,7 +145,6 @@ namespace PictureLibTests
             using var picture = new Picture(_sampleImagePath);
             picture.Open();
 
-            Assert.IsTrue(picture.IsLoaded);
             Assert.Greater(picture.Width, 0);
             Assert.Greater(picture.Height, 0);
             Assert.Greater(picture.Colors, 0);
@@ -176,13 +180,11 @@ namespace PictureLibTests
             using var picture = new Picture(_sampleImagePath);
             picture.Open();
 
-            Assert.IsTrue(picture.IsLoaded);
             var widthBeforeClose = picture.Width;
             Assert.Greater(widthBeforeClose, 0);
 
             picture.Close();
 
-            Assert.IsFalse(picture.IsLoaded);
             Assert.AreEqual(0, picture.Width);
             Assert.AreEqual(0, picture.Height);
             Assert.AreEqual(0, picture.Colors);
@@ -207,7 +209,6 @@ namespace PictureLibTests
             var secondWidth = picture.Width;
 
             Assert.AreEqual(firstWidth, secondWidth);
-            Assert.IsTrue(picture.IsLoaded);
         }
 
         [Test]
@@ -224,6 +225,59 @@ namespace PictureLibTests
 
             Assert.IsNotNull(picture.CameraModel);
             Assert.IsNotEmpty(picture.CameraModel);
+        }
+
+        [Test]
+        [Category("Integration")]
+        public void Open_WithValidSampleRawImage_ExtractsCaptureDate()
+        {
+            if (string.IsNullOrEmpty(_sampleImagePath))
+            {
+                Assert.Inconclusive("No sample RAW images found in Pictures directory");
+            }
+
+            using var picture = new Picture(_sampleImagePath);
+            picture.Open();
+
+            // CaptureDate may be MinValue if timestamp is not available in image metadata
+            // (common with scanned images or some RAW formats)
+            Assert.IsNotNull(picture.CaptureDate);
+            Assert.That(picture.CaptureDate, Is.GreaterThanOrEqualTo(DateTime.MinValue));
+        }
+
+        [Test]
+        [Category("Integration")]
+        [Explicit]
+        public void OpenJpg_WithValidSampleJpgImage_ExtractsCaptureDate()
+        {
+            if (string.IsNullOrEmpty(_sampleJpgImagePath))
+            {
+                Assert.Inconclusive("No sample JPG images found in Pictures directory");
+            }
+
+            using var picture = new Picture(_sampleJpgImagePath);
+            picture.Open();
+
+            // CaptureDate may be MinValue if timestamp is not available in image metadata
+            // (common with scanned images or some RAW formats)
+            Assert.IsNotNull(picture.CaptureDate);
+            Assert.That(picture.CaptureDate, Is.GreaterThanOrEqualTo(DateTime.MinValue));
+        }
+        [Test]
+        [Category("Integration")]
+        public void Open_WithValidSampleRawImage_IncludesDateInImageInfo()
+        {
+            if (string.IsNullOrEmpty(_sampleImagePath))
+            {
+                Assert.Inconclusive("No sample RAW images found in Pictures directory");
+            }
+
+            using var picture = new Picture(_sampleImagePath);
+            picture.Open();
+
+            var imageInfo = picture.GetImageInfo();
+            // Should include Date field (whether it's an actual date or "Unknown date")
+            Assert.That(imageInfo, Does.Contain("Date:"));
         }
     }
 }

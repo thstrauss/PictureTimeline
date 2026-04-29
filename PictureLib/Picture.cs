@@ -1,4 +1,5 @@
 ﻿using Sdcb.LibRaw;
+using Sdcb.LibRaw.Natives;
 
 namespace PictureLib
 {
@@ -9,8 +10,6 @@ namespace PictureLib
     public sealed class Picture : IDisposable
     {
         private RawContext? _rawContext;
-        private ProcessedImage? _processedImage;
-        private bool _disposed;
 
         public Picture(string path) 
         {
@@ -23,7 +22,7 @@ namespace PictureLib
         public int Height { get; private set; }
         public int Colors { get; private set; }
         public string? CameraModel { get; private set; }
-        public bool IsLoaded { get; private set; }
+        public DateTime CaptureDate { get; private set; }
 
         public void Open()
         {
@@ -37,18 +36,25 @@ namespace PictureLib
                 _rawContext = RawContext.OpenFile(Path);
 
                 // Get basic metadata
-                var imageParams = _rawContext.ImageParams;
+                LibRawImageParams imageParams = _rawContext.ImageParams;
+                LibRawImageOtherParams otherParams = _rawContext.ImageOtherParams;
+
                 CameraModel = imageParams.Model;
                 Colors = imageParams.Colors;
 
-                // Process the image to get dimensions
-                _rawContext.Unpack();
-                _rawContext.DcrawProcess();
-                _processedImage = _rawContext.MakeDcrawMemoryImage();
+                // Extract capture date from Unix timestamp
+                // Timestamp is seconds since epoch (1970-01-01 00:00:00 UTC)
+                if (otherParams.Timestamp > 0)
+                {
+                    CaptureDate = UnixTimeStampToDateTime(otherParams.Timestamp);
+                }
+                else
+                {
+                    CaptureDate = DateTime.MinValue;
+                }
 
-                Width = _processedImage.Width;
-                Height = _processedImage.Height;
-                IsLoaded = true;
+                Width = _rawContext.Width;
+                Height = _rawContext.Height;
             }
             catch (Exception)
             {
@@ -59,36 +65,39 @@ namespace PictureLib
 
         public void Close()
         {
-            _processedImage?.Dispose();
-            _processedImage = null;
             _rawContext?.Dispose();
             _rawContext = null;
-            IsLoaded = false;
             Width = 0;
             Height = 0;
             Colors = 0;
             CameraModel = null;
+            CaptureDate = DateTime.MinValue;
         }
 
         public string GetImageInfo()
         {
-            if (!IsLoaded)
+            if (_rawContext == null)
             {
                 return "Image not loaded";
             }
 
-            return $"{Path}: {Width}x{Height} ({Colors} colors) - Camera: {CameraModel}";
+            var dateString = CaptureDate != DateTime.MinValue 
+                ? CaptureDate.ToString("yyyy-MM-dd HH:mm:ss") 
+                : "Unknown date";
+
+            return $"{Path}: {Width}x{Height} ({Colors} colors) - Camera: {CameraModel} - Date: {dateString}";
+        }
+
+        private static DateTime UnixTimeStampToDateTime(long unixTimeStamp)
+        {
+            var dateTime = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
+            dateTime = dateTime.AddSeconds(unixTimeStamp).ToLocalTime();
+            return dateTime;
         }
 
         public void Dispose()
         {
-            if (_disposed)
-            {
-                return;
-            }
-
             Close();
-            _disposed = true;
         }
     }
 }
