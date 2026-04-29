@@ -39,8 +39,20 @@ jobs:
           **/TestResults/**/*.trx
           **/TestResults/**/coverage.cobertura.xml
 
-    - name: Publish test results
-      uses: EnricoMi/publish-unit-test-result-action/composite@v2
-      if: always()
+    - name: Publish Test Results
+      uses: EnricoMi/publish-unit-test-result-action/linux@v2
+      if: runner.os == 'Linux'
       with:
-        files: '**/TestResults/**/*.trx'
+        files: test-results/**/*.xml
+
+    - name: Publish Test Results
+      uses: EnricoMi/publish-unit-test-result-action/macos@v2
+      if: runner.os == 'macOS'
+      with:
+        files: test-results/**/*.xml
+
+    - name: Publish Test Results
+      uses: EnricoMi/publish-unit-test-result-action/windows/bash@v2
+      if: runner.os == 'Windows'
+      with:
+        files: test-results/**/*.xml
