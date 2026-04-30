@@ -50,14 +50,6 @@ namespace PictureLibTests
             using var picture = new Picture(@"C:\test.raw");
             Assert.AreEqual(0, picture.Width);
             Assert.AreEqual(0, picture.Height);
-            Assert.AreEqual(0, picture.Colors);
-        }
-
-        [Test]
-        public void CameraModel_InitiallyNull()
-        {
-            using var picture = new Picture(@"C:\test.raw");
-            Assert.IsNull(picture.CameraModel);
         }
 
         [Test]
@@ -91,8 +83,6 @@ namespace PictureLibTests
 
             Assert.AreEqual(0, picture.Width);
             Assert.AreEqual(0, picture.Height);
-            Assert.AreEqual(0, picture.Colors);
-            Assert.IsNull(picture.CameraModel);
             Assert.AreEqual(DateTime.MinValue, picture.CaptureDate);
         }
 
@@ -147,7 +137,6 @@ namespace PictureLibTests
 
             Assert.Greater(picture.Width, 0);
             Assert.Greater(picture.Height, 0);
-            Assert.Greater(picture.Colors, 0);
         }
 
         [Test]
@@ -164,7 +153,6 @@ namespace PictureLibTests
 
             var imageInfo = picture.GetImageInfo();
             Assert.That(imageInfo, Does.Contain("x"));
-            Assert.That(imageInfo, Does.Contain("colors"));
             Assert.That(imageInfo, Does.Not.Contain("not loaded"));
         }
 
@@ -187,7 +175,6 @@ namespace PictureLibTests
 
             Assert.AreEqual(0, picture.Width);
             Assert.AreEqual(0, picture.Height);
-            Assert.AreEqual(0, picture.Colors);
         }
 
         [Test]
@@ -222,9 +209,6 @@ namespace PictureLibTests
 
             using var picture = new Picture(_sampleImagePath);
             picture.Open();
-
-            Assert.IsNotNull(picture.CameraModel);
-            Assert.IsNotEmpty(picture.CameraModel);
         }
 
         [Test]
@@ -247,7 +231,6 @@ namespace PictureLibTests
 
         [Test]
         [Category("Integration")]
-        [Explicit]
         public void OpenJpg_WithValidSampleJpgImage_ExtractsCaptureDate()
         {
             if (string.IsNullOrEmpty(_sampleJpgImagePath))

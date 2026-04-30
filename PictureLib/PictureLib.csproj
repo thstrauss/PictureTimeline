@@ -13,6 +13,7 @@
     </PackageReference>
     <PackageReference Include="Sdcb.LibRaw" />
     <PackageReference Include="Sdcb.LibRaw.runtime.win64" />
+    <PackageReference Include="System.Drawing.Common" />
   </ItemGroup>
 
 </Project>

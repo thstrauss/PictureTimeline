@@ -1,15 +1,18 @@
 ﻿using Sdcb.LibRaw;
 using Sdcb.LibRaw.Natives;
+using System.Drawing;
+using System.Drawing.Imaging;
 
 namespace PictureLib
 {
     /// <summary>
-    /// Represents a RAW image file and provides functionality to open and extract metadata using LibRaw.
-    /// Supports various RAW formats (ARW, CR2, DNG, etc.) from different camera models.
+    /// Represents an image file and provides functionality to open and extract metadata.
+    /// Supports various RAW formats (ARW, CR2, DNG, etc.) using LibRaw and JPEG formats using System.Drawing.
     /// </summary>
     public sealed class Picture : IDisposable
     {
         private RawContext? _rawContext;
+        private Bitmap? _bitmap;
 
         public Picture(string path) 
         {
@@ -20,8 +23,6 @@ namespace PictureLib
 
         public int Width { get; private set; }
         public int Height { get; private set; }
-        public int Colors { get; private set; }
-        public string? CameraModel { get; private set; }
         public DateTime CaptureDate { get; private set; }
 
         public void Open()
@@ -33,28 +34,16 @@ namespace PictureLib
 
             try
             {
-                _rawContext = RawContext.OpenFile(Path);
+                string extension = System.IO.Path.GetExtension(Path).ToLowerInvariant();
 
-                // Get basic metadata
-                LibRawImageParams imageParams = _rawContext.ImageParams;
-                LibRawImageOtherParams otherParams = _rawContext.ImageOtherParams;
-
-                CameraModel = imageParams.Model;
-                Colors = imageParams.Colors;
-
-                // Extract capture date from Unix timestamp
-                // Timestamp is seconds since epoch (1970-01-01 00:00:00 UTC)
-                if (otherParams.Timestamp > 0)
+                if (extension == ".jpg" || extension == ".jpeg")
                 {
-                    CaptureDate = UnixTimeStampToDateTime(otherParams.Timestamp);
+                    OpenJpeg();
                 }
                 else
                 {
-                    CaptureDate = DateTime.MinValue;
+                    OpenRaw();
                 }
-
-                Width = _rawContext.Width;
-                Height = _rawContext.Height;
             }
             catch (Exception)
             {
@@ -63,20 +52,74 @@ namespace PictureLib
             }
         }
 
+        private void OpenRaw()
+        {
+            _rawContext = RawContext.OpenFile(Path);
+
+            LibRawImageOtherParams otherParams = _rawContext.ImageOtherParams;
+
+            CaptureDate = otherParams.Timestamp > 0 ? UnixTimeStampToDateTime(otherParams.Timestamp) : DateTime.MinValue;
+
+            Width = _rawContext.Width;
+            Height = _rawContext.Height;
+        }
+
+        private void OpenJpeg()
+        {
+            _bitmap = new Bitmap(Path);
+
+            Width = _bitmap.Width;
+            Height = _bitmap.Height;
+
+            // Try to extract EXIF date from JPEG
+            CaptureDate = ExtractExifDate(_bitmap);
+        }
+
+        private static DateTime ExtractExifDate(Bitmap bitmap)
+        {
+            try
+            {
+                // EXIF tag for DateTime is 0x0132 (306 in decimal)
+                const int exifDateTimeTag = 0x0132;
+
+                if (bitmap.PropertyIdList.Contains(exifDateTimeTag))
+                {
+                    PropertyItem? exifDate = bitmap.GetPropertyItem(exifDateTimeTag);
+                    if (exifDate != null)
+                    {
+                        string dateString = System.Text.Encoding.ASCII.GetString(exifDate.Value).Trim('\0');
+                        if (DateTime.TryParseExact(dateString, "yyyy:MM:dd HH:mm:ss", 
+                            System.Globalization.CultureInfo.InvariantCulture, 
+                            System.Globalization.DateTimeStyles.None, 
+                            out DateTime result))
+                        {
+                            return result;
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // If EXIF extraction fails, return MinValue
+            }
+
+            return DateTime.MinValue;
+        }
+
         public void Close()
         {
             _rawContext?.Dispose();
             _rawContext = null;
+            _bitmap?.Dispose();
+            _bitmap = null;
             Width = 0;
             Height = 0;
-            Colors = 0;
-            CameraModel = null;
             CaptureDate = DateTime.MinValue;
         }
 
         public string GetImageInfo()
         {
-            if (_rawContext == null)
+            if (_rawContext == null && _bitmap == null)
             {
                 return "Image not loaded";
             }
@@ -85,7 +128,7 @@ namespace PictureLib
                 ? CaptureDate.ToString("yyyy-MM-dd HH:mm:ss") 
                 : "Unknown date";
 
-            return $"{Path}: {Width}x{Height} ({Colors} colors) - Camera: {CameraModel} - Date: {dateString}";
+            return $"{Path}: {Width}x{Height} - Date: {dateString}";
         }
 
         private static DateTime UnixTimeStampToDateTime(long unixTimeStamp)
