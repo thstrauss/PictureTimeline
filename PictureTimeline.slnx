@@ -1,5 +1,5 @@
 <Solution>
-  <Project Path="PictureLib/PictureLib.csproj" Id="671c48f8-ded3-4cb7-bc76-3adc2f94e027" />
-  <Project Path="PictureLibTests/PictureLibTests.csproj" />
+  <Project Path="PictureLib/PictureLib.csproj"/>
+  <Project Path="PictureLibTests/PictureLibTests.csproj"/>
   <Project Path="PictureTimeline/PictureTimeline.csproj" />
 </Solution>
